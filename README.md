@@ -8,6 +8,8 @@ This custom component provides full climate control for air conditioners manufac
 
 **HISENSE AS-13UW4RVETG01**
 
+**Newtek NT-77HSDC12**
+
 and should work with many other models.
 
 The component exposes a standard Home Assistant Climate entity, along with a set of optional sensors and switches to access all advanced features of the AC (turbo, eco, quiet, sleep, swing, LED, etc.).
