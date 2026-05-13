@@ -1,4 +1,4 @@
-# ESPHome AC component for Hisense (RS-485)
+# ESPHome component for AC manufactured by Hisense (RS-485 interface) Replacement of the AEH-W4G1 module and others.
 
 ![primer](https://github.com/user-attachments/assets/1ad2cd3d-0561-4a50-bdaf-25f950640be8)
 
