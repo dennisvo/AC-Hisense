@@ -50,6 +50,7 @@ enum FrameIndex : uint8_t {
   IDX_PIPE_TEMP = 21,
 
   // Write-frame indexes.
+  IDX_TX_BEEP = 23,
   IDX_TX_SWING = 32,
   IDX_TX_TURBO_ECO = 33,
   IDX_TX_QUIET = 35,
@@ -80,6 +81,8 @@ enum BitMasks : uint8_t {
 
 // Values for turbo/eco/quiet encoding (matching legacy YAML)
 namespace TxValues {
+  constexpr uint8_t BEEP_ON   = 0x04;
+  constexpr uint8_t BEEP_OFF  = 0x00;
   constexpr uint8_t TURBO_ON  = 0b00001100;
   constexpr uint8_t TURBO_OFF = 0b00000100;
   constexpr uint8_t ECO_ON    = 0b00110000;
@@ -211,6 +214,10 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   // Pending control from HA (debounced)
   bool pending_control_{false};
   uint32_t last_control_ms_{0};
+
+  // Audible beep is requested only for real user commands.
+  // Automatic HA-priority re-sends stay silent to avoid repeated beeping.
+  bool beep_on_next_write_{false};
 
   // Base write frame (template)
   std::vector<uint8_t> tx_bytes_ = {

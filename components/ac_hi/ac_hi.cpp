@@ -324,6 +324,7 @@ void ACHIClimate::control(const climate::ClimateCall &call) {
   // Mark that we have a pending command (debounced)
   pending_control_ = true;
   last_control_ms_ = millis();
+  beep_on_next_write_ = true;
 
   ESP_LOGD(TAG, "Control: new desired state registered, will send after %ums debounce", CONTROL_DEBOUNCE_MS);
 }
@@ -375,13 +376,15 @@ void ACHIClimate::send_query_status_() {
 // ---- Send write command ----
 void ACHIClimate::send_write_changes_() {
   build_tx_from_desired_();                // ensure tx_bytes_ reflects latest d_*
+  tx_bytes_[IDX_TX_BEEP] = beep_on_next_write_ ? TxValues::BEEP_ON : TxValues::BEEP_OFF;
   calc_and_patch_crc_(tx_bytes_);
-  ESP_LOGD(TAG, "Sending write command (0x65)");
+  ESP_LOGD(TAG, "Sending write command (0x65): beep_byte[23]=0x%02X", tx_bytes_[IDX_TX_BEEP]);
   log_frame_("TX write", tx_bytes_);
   for (auto b : tx_bytes_) write_byte(b);
   flush();
 
   last_tx_frame_.assign(tx_bytes_.begin(), tx_bytes_.end());
+  beep_on_next_write_ = false;
 
   writing_lock_ = true;
   write_lock_time_ = millis();
@@ -777,6 +780,7 @@ void ACHIClimate::set_desired_led(bool on) {
 
   pending_control_ = true;
   last_control_ms_ = millis();
+  beep_on_next_write_ = true;
 
   ESP_LOGD(TAG, "LED switch: desired_led=%s, pending write", on ? "ON" : "OFF");
   // update_led_switch_state_() will be called from loop after publish
