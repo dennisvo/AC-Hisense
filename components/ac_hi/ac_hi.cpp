@@ -323,6 +323,7 @@ void ACHIClimate::control(const climate::ClimateCall &call) {
 
   // Mark that we have a pending command (debounced)
   pending_control_ = true;
+  pending_control_beep_ = true;
   last_control_ms_ = millis();
 
   ESP_LOGD(TAG, "Control: new desired state registered, will send after %ums debounce", CONTROL_DEBOUNCE_MS);
@@ -345,9 +346,10 @@ void ACHIClimate::build_tx_from_desired_() {
   tx_bytes_[IDX_SLEEP] = encode_sleep_byte_(d_sleep_stage_);
 
   // Command confirmation beep / fixed control byte (byte 23).
-  // The original legacy YAML always sent 0x04 here. If it is 0x00,
-  // some Hisense indoor units execute commands silently.
-  tx_bytes_[IDX_TX_BEEP] = TxValues::BEEP_ON;
+  // Use 0x04 only for real user commands. Automatic HA enforcement/retry
+  // commands are sent silently, otherwise the unit keeps beeping while HA
+  // is waiting for a status representation that this model never reports.
+  tx_bytes_[IDX_TX_BEEP] = pending_control_beep_ ? TxValues::BEEP_ON : TxValues::BEEP_OFF;
 
   // Swing (byte 32)
   bool v = (d_swing_ == climate::CLIMATE_SWING_VERTICAL) || (d_swing_ == climate::CLIMATE_SWING_BOTH);
@@ -381,8 +383,8 @@ void ACHIClimate::send_query_status_() {
 void ACHIClimate::send_write_changes_() {
   build_tx_from_desired_();                // ensure tx_bytes_ reflects latest d_*
   calc_and_patch_crc_(tx_bytes_);
-  ESP_LOGD(TAG, "Sending write command (0x65): beep_byte[23]=0x%02X led_byte[36]=0x%02X",
-           tx_bytes_[IDX_TX_BEEP], tx_bytes_[IDX_TX_LED]);
+  ESP_LOGD(TAG, "Sending write command (0x65): beep_byte[23]=0x%02X (%s) led_byte[36]=0x%02X",
+           tx_bytes_[IDX_TX_BEEP], pending_control_beep_ ? "audible" : "silent", tx_bytes_[IDX_TX_LED]);
   log_frame_("TX write", tx_bytes_);
   for (auto b : tx_bytes_) write_byte(b);
   flush();
@@ -391,6 +393,9 @@ void ACHIClimate::send_write_changes_() {
 
   writing_lock_ = true;
   write_lock_time_ = millis();
+
+  // The beep flag is one-shot. A later automatic retry must not beep.
+  pending_control_beep_ = false;
 }
 
 // ---- CRC calculation ----
@@ -567,11 +572,17 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
   quiet_ = (b[IDX_RX_QUIET] & QUIET_MASK) != 0;   // byte 36 in status frame
   led_   = (b[IDX_RX_LED] & LED_MASK) != 0;       // byte 37 in status frame
 
-  // On this model Quiet is signaled by the quiet flag, while raw_wind may remain 2.
+  // On this model some special modes are not exposed as dedicated status bits.
+  // BOOST is reported as raw wind code 18, while Turbo/Eco status bits may stay 0.
+  if (power_on_ && raw_wind == 18) {
+    turbo_ = true;
+  }
+
+  // Quiet selected from HA/remote is signaled by the quiet flag, while raw_wind may remain 2.
+  // BOOST uses a dedicated wind code and should be shown as HIGH fan in cooling.
   if (quiet_) {
     fan_ = climate::CLIMATE_FAN_QUIET;
   } else if (turbo_ && raw_wind == 18) {
-    // Turbo uses a dedicated fan code on this platform.
     fan_ = (mode_ == climate::CLIMATE_MODE_HEAT) ? climate::CLIMATE_FAN_AUTO
                                                  : climate::CLIMATE_FAN_HIGH;
   }
@@ -696,7 +707,7 @@ void ACHIClimate::update_led_switch_state_() {
 void ACHIClimate::maybe_force_to_target_() {
   if (!ha_priority_active_) return;
 
-  if (actual_sig_ == desired_sig_) {
+  if (is_actual_equivalent_to_desired_()) {
     ha_priority_active_ = false;
     accept_remote_changes_ = true;
     ESP_LOGI(TAG, "Converged to desired HA state; remote changes accepted again");
@@ -709,10 +720,63 @@ void ACHIClimate::maybe_force_to_target_() {
   }
 
   if (!writing_lock_) {
-    ESP_LOGD(TAG, "Enforcing desired state (actual≠desired) – requesting write");
+    ESP_LOGD(TAG, "Enforcing desired state (actual≠desired) – requesting silent write");
     pending_control_ = true;
+    pending_control_beep_ = false;
     last_control_ms_ = millis();   // restart debounce
   }
+}
+
+bool ACHIClimate::is_actual_equivalent_to_desired_() const {
+  if (power_on_ != d_power_on_) return false;
+
+  if (!d_power_on_) {
+    // In OFF state the indoor unit keeps reporting stale mode/fan/temperature fields.
+    return true;
+  }
+
+  if (mode_ != d_mode_) return false;
+
+  if (led_switch_ != nullptr && led_ != d_led_) return false;
+
+  // Keep swing strict: the unit reports these bits reliably on this model.
+  if (swing_ != d_swing_) return false;
+
+  // Target temperature is meaningful for COOL/HEAT/DRY and also remains in FAN_ONLY status.
+  if (target_c_ != d_target_c_) return false;
+
+  // BOOST: this unit reports BOOST as raw wind code 18. parse_status_102_ maps that to
+  // turbo_=true and fan HIGH/AUTO, even though the explicit Turbo status bit remains 0.
+  if (d_turbo_) {
+    return turbo_;
+  }
+
+  // ECO: the unit accepts the ECO command but reports it back as quiet airflow with
+  // target 24°C and no Economy status bit. Treat that operational state as converged.
+  if (d_eco_) {
+    return fan_ == climate::CLIMATE_FAN_QUIET && target_c_ == 24;
+  }
+
+  // SLEEP: on this unit the sleep status byte often remains 0 after a SLEEP command.
+  // The observable accepted state is quiet airflow plus the adjusted target temperature.
+  if (d_sleep_stage_ > 0) {
+    return fan_ == climate::CLIMATE_FAN_QUIET;
+  }
+
+  // DRY and FAN_ONLY may report quiet airflow even when HA requested AUTO.
+  // Avoid endless corrective writes for this harmless representation difference.
+  if ((d_mode_ == climate::CLIMATE_MODE_DRY || d_mode_ == climate::CLIMATE_MODE_FAN_ONLY) &&
+      d_fan_ == climate::CLIMATE_FAN_AUTO && fan_ == climate::CLIMATE_FAN_QUIET) {
+    return !eco_ && !turbo_ && !quiet_ && sleep_stage_ == 0;
+  }
+
+  if (fan_ != d_fan_) return false;
+  if (eco_ != d_eco_) return false;
+  if (turbo_ != d_turbo_) return false;
+  if (quiet_ != d_quiet_) return false;
+  if (sleep_stage_ != d_sleep_stage_) return false;
+
+  return true;
 }
 
 // ---- Signature computation ----
@@ -782,6 +846,7 @@ void ACHIClimate::set_desired_led(bool on) {
   recalc_desired_sig_();
 
   pending_control_ = true;
+  pending_control_beep_ = true;
   last_control_ms_ = millis();
 
   ESP_LOGD(TAG, "LED switch: desired_led=%s, pending write", on ? "ON" : "OFF");

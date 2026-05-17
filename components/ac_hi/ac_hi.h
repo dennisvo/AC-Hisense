@@ -93,6 +93,7 @@ namespace TxValues {
   constexpr uint8_t LEFTRIGHT_OFF = 0b00010000;
   // Constant byte present in the legacy YAML and in known Hisense display frames.
   // Without it, the indoor unit accepts commands but may not emit the confirmation beep.
+  constexpr uint8_t BEEP_OFF = 0x00;
   constexpr uint8_t BEEP_ON  = 0x04;
   constexpr uint8_t LED_ON   = 0b11000000;
   constexpr uint8_t LED_OFF  = 0b01000000;
@@ -180,6 +181,7 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   void publish_gated_state_();
   void update_led_switch_state_();
   void maybe_force_to_target_();                     // <-- добавлено объявление
+  bool is_actual_equivalent_to_desired_() const;
   void maybe_send_pending_control_();                // (опционально, если используется)
 
   // Signatures for convergence detection
@@ -214,6 +216,7 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
 
   // Pending control from HA (debounced)
   bool pending_control_{false};
+  bool pending_control_beep_{false};
   uint32_t last_control_ms_{0};
 
   // Base write frame (template)
