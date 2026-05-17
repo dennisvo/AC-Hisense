@@ -658,29 +658,41 @@ void ACHIClimate::handle_ack_101_() {
 // ---- Gating and convergence ----
 void ACHIClimate::publish_gated_state_() {
   if (accept_remote_changes_) {
-    // Publish actual state (from AC)
+    // Publish actual state (from AC).
+    // Some Hisense indoor units accept ECO/SLEEP commands but do not expose the
+    // corresponding status bits in later 0x66 frames. If HA previously requested
+    // one of these modes and the observable state still matches it, keep the HA
+    // preset latched instead of immediately falling back to PRESET_NONE.
+    const bool synthetic_eco = d_eco_ && power_on_ && !turbo_ &&
+                               fan_ == climate::CLIMATE_FAN_QUIET && target_c_ == 24;
+    const bool synthetic_sleep = d_sleep_stage_ > 0 && power_on_ && !turbo_ && !eco_ &&
+                                  fan_ == climate::CLIMATE_FAN_QUIET && target_c_ == d_target_c_;
+
     this->mode = power_on_ ? mode_ : climate::CLIMATE_MODE_OFF;
     this->target_temperature = target_c_;
     this->fan_mode = fan_;
     this->swing_mode = swing_;
     if (enable_presets_) {
       if (turbo_) this->set_preset_(climate::CLIMATE_PRESET_BOOST);
-      else if (eco_) this->set_preset_(climate::CLIMATE_PRESET_ECO);
-      else if (sleep_stage_ > 0) this->set_preset_(climate::CLIMATE_PRESET_SLEEP);
+      else if (eco_ || synthetic_eco) this->set_preset_(climate::CLIMATE_PRESET_ECO);
+      else if (sleep_stage_ > 0 || synthetic_sleep) this->set_preset_(climate::CLIMATE_PRESET_SLEEP);
       else if (quiet_) this->set_custom_preset_(CUSTOM_PRESET_QUIET);
       else this->set_preset_(climate::CLIMATE_PRESET_NONE);
     }
-    // Sync desired with actual
+    // Sync desired with actual, but preserve latched HA presets that this AC
+    // reports only indirectly. This keeps ECO/SLEEP visible in Home Assistant
+    // after the command has converged, while still allowing later remote/manual
+    // changes to clear the preset when the observable state no longer matches.
     d_power_on_    = power_on_;
     d_mode_        = mode_;
     d_target_c_    = target_c_;
     d_fan_         = fan_;
     d_swing_       = swing_;
-    d_eco_         = eco_;
+    d_eco_         = eco_ || synthetic_eco;
     d_turbo_       = turbo_;
-    d_quiet_       = quiet_;
+    d_quiet_       = (synthetic_eco || synthetic_sleep) ? false : quiet_;
     d_led_         = led_;
-    d_sleep_stage_ = sleep_stage_;
+    d_sleep_stage_ = sleep_stage_ > 0 ? sleep_stage_ : (synthetic_sleep ? d_sleep_stage_ : 0);
     recalc_desired_sig_();
   } else {
     // Publish desired state (while enforcing)
