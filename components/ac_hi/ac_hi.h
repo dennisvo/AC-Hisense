@@ -50,7 +50,6 @@ enum FrameIndex : uint8_t {
   IDX_PIPE_TEMP = 21,
 
   // Write-frame indexes.
-  IDX_TX_BEEP = 23,
   IDX_TX_SWING = 32,
   IDX_TX_TURBO_ECO = 33,
   IDX_TX_QUIET = 35,
@@ -91,10 +90,6 @@ namespace TxValues {
   constexpr uint8_t UPDOWN_OFF = 0b01000000;
   constexpr uint8_t LEFTRIGHT_ON = 0b00110000;
   constexpr uint8_t LEFTRIGHT_OFF = 0b00010000;
-  // Constant byte present in the legacy YAML and in known Hisense display frames.
-  // Without it, the indoor unit accepts commands but may not emit the confirmation beep.
-  constexpr uint8_t BEEP_OFF = 0x00;
-  constexpr uint8_t BEEP_ON  = 0x04;
   constexpr uint8_t LED_ON   = 0b11000000;
   constexpr uint8_t LED_OFF  = 0b01000000;
 }
@@ -181,7 +176,6 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   void publish_gated_state_();
   void update_led_switch_state_();
   void maybe_force_to_target_();                     // <-- добавлено объявление
-  bool is_actual_equivalent_to_desired_() const;
   void maybe_send_pending_control_();                // (опционально, если используется)
 
   // Signatures for convergence detection
@@ -216,7 +210,6 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
 
   // Pending control from HA (debounced)
   bool pending_control_{false};
-  bool pending_control_beep_{false};
   uint32_t last_control_ms_{0};
 
   // Base write frame (template)
@@ -228,7 +221,7 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
       0x00, // [19] set temp (encoded)
       0x00, // [20] current temp (RO)
       0x00, // [21] pipe temp (RO)
-      0x00, 0x04, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 22..29; [23]=0x04 enables command confirmation beep
+      0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, // 22..29
       0x00, 0x00, // 30..31
       0x00, // [32] swing UD/LR
       0x00, // [33] turbo/eco
