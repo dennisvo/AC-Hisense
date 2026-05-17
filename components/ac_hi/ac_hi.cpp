@@ -375,12 +375,18 @@ void ACHIClimate::build_tx_from_desired_() {
   }
 
   // Display/LED command (byte 36).
-  // 0xC0/0x40 are explicit display ON/OFF actions. Do not put the current
-  // display state into every climate write: when the display is OFF, re-sending
-  // 0x40 on automatic retries makes the indoor unit beep even with beep_byte=0.
-  tx_bytes_[IDX_TX_LED] = led_command_pending_
-      ? (d_led_ ? TxValues::LED_ON : TxValues::LED_OFF)
-      : 0x00;
+  // 0xC0/0x40 are explicit display ON/OFF actions.
+  // Keep automatic HA-priority re-sends neutral (0x00) so they stay silent.
+  // But when the user sends a real climate command while the display is OFF,
+  // include LED_OFF once in that audible command; otherwise this indoor unit
+  // turns the front display back on after mode/preset changes.
+  if (led_command_pending_) {
+    tx_bytes_[IDX_TX_LED] = d_led_ ? TxValues::LED_ON : TxValues::LED_OFF;
+  } else if (beep_on_next_write_ && !d_led_) {
+    tx_bytes_[IDX_TX_LED] = TxValues::LED_OFF;
+  } else {
+    tx_bytes_[IDX_TX_LED] = 0x00;
+  }
 }
 
 // ---- Send status query ----
@@ -760,10 +766,12 @@ uint32_t ACHIClimate::compute_control_signature_(bool power, climate::ClimateMod
     target_c = 24;
   }
 
-  // If LED switch is not configured, ignore LED bit in convergence logic.
-  if (led_switch_ == nullptr) {
-    led = true;
-  }
+  // The display/LED byte behaves like an action, not a stable climate field.
+  // Ignore it for convergence even when the optional LED switch exists. This
+  // prevents a climate command that temporarily wakes the display from causing
+  // endless HA-priority re-sends or an automatic LED_ON command. The LED switch
+  // itself still sends one explicit 0xC0/0x40 command when toggled.
+  led = true;
 
   uint32_t h = 2166136261u;
   auto mix = [&h](uint32_t x) {
@@ -789,8 +797,48 @@ void ACHIClimate::recalc_desired_sig_() {
 }
 
 void ACHIClimate::recalc_actual_sig_() {
-  actual_sig_ = compute_control_signature_(power_on_, mode_, fan_, swing_,
-                                           eco_, turbo_, quiet_, led_, sleep_stage_, target_c_);
+  bool effective_eco = eco_;
+  bool effective_turbo = turbo_;
+  bool effective_quiet = quiet_;
+  uint8_t effective_sleep_stage = sleep_stage_;
+  auto effective_fan = fan_;
+
+  // Some Hisense indoor units acknowledge special modes only indirectly in
+  // status frames. For HA-priority convergence, accept those indirect states
+  // without changing the normal published UI state. This stops repeated silent
+  // writes after BOOST/ECO/SLEEP while preserving the original preset display
+  // behavior from the working baseline.
+  if (ha_priority_active_ && d_power_on_ && power_on_ && mode_ == d_mode_) {
+    if (d_turbo_ && target_c_ == d_target_c_) {
+      effective_turbo = true;
+      effective_eco = false;
+      effective_quiet = false;
+      effective_sleep_stage = 0;
+      effective_fan = d_fan_;
+    } else if (d_eco_ && target_c_ == d_target_c_ && fan_ == climate::CLIMATE_FAN_QUIET) {
+      effective_eco = true;
+      effective_turbo = false;
+      effective_quiet = false;
+      effective_sleep_stage = 0;
+      effective_fan = d_fan_;
+    } else if (d_sleep_stage_ > 0 && target_c_ == d_target_c_ && fan_ == climate::CLIMATE_FAN_QUIET) {
+      effective_sleep_stage = d_sleep_stage_;
+      effective_eco = false;
+      effective_turbo = false;
+      effective_quiet = false;
+      effective_fan = d_fan_;
+    } else if (d_quiet_ && fan_ == climate::CLIMATE_FAN_QUIET) {
+      effective_quiet = true;
+      effective_eco = false;
+      effective_turbo = false;
+      effective_sleep_stage = 0;
+      effective_fan = d_fan_;
+    }
+  }
+
+  actual_sig_ = compute_control_signature_(power_on_, mode_, effective_fan, swing_,
+                                           effective_eco, effective_turbo, effective_quiet,
+                                           led_, effective_sleep_stage, target_c_);
 }
 
 void ACHIClimate::log_sig_diff_() const {
