@@ -157,6 +157,11 @@ climate:
       accuracy_decimals: 0
       icon: "mdi:sine-wave"
 
+    compressor_exhaust_temperature:
+      name: "Compressor Exhaust Temperature"
+      unit_of_measurement: "°C"
+      icon: "mdi:thermometer"
+
     outdoor_temperature:
       name: "Temperature Outdoor"
       unit_of_measurement: "°C"
