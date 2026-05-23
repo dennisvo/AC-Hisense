@@ -77,7 +77,6 @@ void ACHIClimate::setup() {
   target_temperature = 24;
   fan_mode = climate::CLIMATE_FAN_AUTO;
   swing_mode = climate::CLIMATE_SWING_OFF;
-
   // Desired state mirrors initial
   d_power_on_     = false;
   d_mode_         = climate::CLIMATE_MODE_OFF;
@@ -678,16 +677,10 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
   publish_gated_state_();
   update_led_switch_state_();
 
-  // Log raw diagnostic bytes before publishing optional sensors.
-  // These indexes come from an alternative Hisense ESPHome component and must be
-  // validated on this specific indoor unit before being mapped to named sensors.
-  ESP_LOGD(TAG,
-           "Diag raw bytes: b22=%u b23=%u b24=%u | b42=%u b43=%u b44=%u/%d b45=%u/%d b46=%u/%d b47=%u/%d b48=%u/%d",
-           b[22], b[23], b[24],
-           b[42], b[43],
-           b[44], static_cast<int8_t>(b[44]),
-           b[45], static_cast<int8_t>(b[45]),
-           b[46], static_cast<int8_t>(b[46]),
+  // Keep still-unmapped candidate fields available only in verbose logs.
+  ESP_LOGV(TAG,
+           "Extended status: compressor_set=%uHz compressor=%uHz exhaust=%u°C raw_b47=%u/%d raw_b48=%u/%d",
+           b[IDX_COMP_FREQ_SET], b[IDX_COMP_FREQ], b[IDX_COMPRESSOR_EXHAUST_TEMP],
            b[47], static_cast<int8_t>(b[47]),
            b[48], static_cast<int8_t>(b[48]));
 
@@ -715,18 +708,9 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
     int8_t t = static_cast<int8_t>(b[IDX_OUTDOOR_COND_TEMP]);
     outdoor_cond_temp_sensor_->publish_state(static_cast<float>(t));
   }
-
-  // Raw diagnostic bytes. Publish unsigned values exactly as seen in the status frame.
-  if (status_byte_22_sensor_ != nullptr) status_byte_22_sensor_->publish_state(b[22]);
-  if (status_byte_23_sensor_ != nullptr) status_byte_23_sensor_->publish_state(b[23]);
-  if (status_byte_24_sensor_ != nullptr) status_byte_24_sensor_->publish_state(b[24]);
-  if (status_byte_42_sensor_ != nullptr) status_byte_42_sensor_->publish_state(b[42]);
-  if (status_byte_43_sensor_ != nullptr) status_byte_43_sensor_->publish_state(b[43]);
-  if (status_byte_44_sensor_ != nullptr) status_byte_44_sensor_->publish_state(b[44]);
-  if (status_byte_45_sensor_ != nullptr) status_byte_45_sensor_->publish_state(b[45]);
-  if (status_byte_46_sensor_ != nullptr) status_byte_46_sensor_->publish_state(b[46]);
-  if (status_byte_47_sensor_ != nullptr) status_byte_47_sensor_->publish_state(b[47]);
-  if (status_byte_48_sensor_ != nullptr) status_byte_48_sensor_->publish_state(b[48]);
+  if (compressor_exhaust_temp_sensor_ != nullptr) {
+    compressor_exhaust_temp_sensor_->publish_state(static_cast<float>(b[IDX_COMPRESSOR_EXHAUST_TEMP]));
+  }
 #endif
 
 #ifdef USE_TEXT_SENSOR
@@ -736,13 +720,14 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
 #endif
 
   ESP_LOGD(TAG,
-           "Parsed: power=%s, mode=%s, fan=%s, swing=%s, target=%u°C, current=%.1f°C, outdoor=%d°C",
+           "Parsed: power=%s, mode=%s, fan=%s, swing=%s, target=%u°C, current=%.1f°C, outdoor=%d°C, compressor=%uHz, exhaust=%u°C",
            power_on_ ? "ON" : "OFF",
            climate::climate_mode_to_string(mode_),
            climate::climate_fan_mode_to_string(fan_),
            climate::climate_swing_mode_to_string(swing_),
            (unsigned) target_c_, current_temperature,
-           static_cast<int8_t>(b[IDX_OUTDOOR_TEMP]));
+           static_cast<int8_t>(b[IDX_OUTDOOR_TEMP]),
+           b[IDX_COMP_FREQ], b[IDX_COMPRESSOR_EXHAUST_TEMP]);
 
   // If HA has priority, check convergence and possibly enforce
   maybe_force_to_target_();

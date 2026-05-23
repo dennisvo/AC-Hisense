@@ -41,19 +41,7 @@ CONF_COMP_FR_SET = "compressor_frequency_set"
 CONF_COMP_FR = "compressor_frequency"
 CONF_OUTDOOR_TEMP = "outdoor_temperature"
 CONF_OUTDOOR_COND_TEMP = "outdoor_condenser_temperature"
-
-# Raw protocol diagnostics sensor keys. They are intentionally named as bytes,
-# not as decoded values, until the status map is verified on the real unit.
-CONF_STATUS_BYTE_22 = "status_byte_22"
-CONF_STATUS_BYTE_23 = "status_byte_23"
-CONF_STATUS_BYTE_24 = "status_byte_24"
-CONF_STATUS_BYTE_42 = "status_byte_42"
-CONF_STATUS_BYTE_43 = "status_byte_43"
-CONF_STATUS_BYTE_44 = "status_byte_44"
-CONF_STATUS_BYTE_45 = "status_byte_45"
-CONF_STATUS_BYTE_46 = "status_byte_46"
-CONF_STATUS_BYTE_47 = "status_byte_47"
-CONF_STATUS_BYTE_48 = "status_byte_48"
+CONF_COMPRESSOR_EXHAUST_TEMP = "compressor_exhaust_temperature"
 
 # New memory diagnostics sensor keys
 CONF_HEAP_FREE = "heap_free"
@@ -84,18 +72,7 @@ CONFIG_SCHEMA = BASE_CLIMATE_SCHEMA.extend({
     cv.Optional(CONF_COMP_FR): sensor.sensor_schema(),
     cv.Optional(CONF_OUTDOOR_TEMP): sensor.sensor_schema(),
     cv.Optional(CONF_OUTDOOR_COND_TEMP): sensor.sensor_schema(),
-
-    # Optional raw protocol diagnostics sensors
-    cv.Optional(CONF_STATUS_BYTE_22): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_23): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_24): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_42): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_43): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_44): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_45): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_46): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_47): sensor.sensor_schema(),
-    cv.Optional(CONF_STATUS_BYTE_48): sensor.sensor_schema(),
+    cv.Optional(CONF_COMPRESSOR_EXHAUST_TEMP): sensor.sensor_schema(),
 
     # Power status is a text sensor ("ON"/"OFF")
     cv.Optional(CONF_POWER_STATUS): text_sensor.text_sensor_schema(),
@@ -194,46 +171,9 @@ async def to_code(config):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_outdoor_cond_temp_sensor(sens))
 
-    # Optional raw protocol diagnostics sensors
-    if conf := config.get(CONF_STATUS_BYTE_22):
+    if conf := config.get(CONF_COMPRESSOR_EXHAUST_TEMP):
         sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_22_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_23):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_23_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_24):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_24_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_42):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_42_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_43):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_43_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_44):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_44_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_45):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_45_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_46):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_46_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_47):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_47_sensor(sens))
-
-    if conf := config.get(CONF_STATUS_BYTE_48):
-        sens = await sensor.new_sensor(conf)
-        cg.add(var.set_status_byte_48_sensor(sens))
+        cg.add(var.set_compressor_exhaust_temp_sensor(sens))
 
     # Optional text sensor for power status
     if conf := config.get(CONF_POWER_STATUS):

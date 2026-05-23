@@ -75,6 +75,7 @@ enum FrameIndex : uint8_t {
   IDX_COMP_FREQ = 43,
   IDX_OUTDOOR_TEMP = 44,
   IDX_OUTDOOR_COND_TEMP = 45,
+  IDX_COMPRESSOR_EXHAUST_TEMP = 46,
 };
 
 // Bit masks within specific bytes
@@ -146,18 +147,7 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   void set_compr_freq_sensor(sensor::Sensor *s) { compressor_freq_sensor_ = s; }
   void set_outdoor_temp_sensor(sensor::Sensor *s) { outdoor_temp_sensor_ = s; }
   void set_outdoor_cond_temp_sensor(sensor::Sensor *s) { outdoor_cond_temp_sensor_ = s; }
-
-  // Raw protocol diagnostics sensors (optional). These do not affect control logic.
-  void set_status_byte_22_sensor(sensor::Sensor *s) { status_byte_22_sensor_ = s; }
-  void set_status_byte_23_sensor(sensor::Sensor *s) { status_byte_23_sensor_ = s; }
-  void set_status_byte_24_sensor(sensor::Sensor *s) { status_byte_24_sensor_ = s; }
-  void set_status_byte_42_sensor(sensor::Sensor *s) { status_byte_42_sensor_ = s; }
-  void set_status_byte_43_sensor(sensor::Sensor *s) { status_byte_43_sensor_ = s; }
-  void set_status_byte_44_sensor(sensor::Sensor *s) { status_byte_44_sensor_ = s; }
-  void set_status_byte_45_sensor(sensor::Sensor *s) { status_byte_45_sensor_ = s; }
-  void set_status_byte_46_sensor(sensor::Sensor *s) { status_byte_46_sensor_ = s; }
-  void set_status_byte_47_sensor(sensor::Sensor *s) { status_byte_47_sensor_ = s; }
-  void set_status_byte_48_sensor(sensor::Sensor *s) { status_byte_48_sensor_ = s; }
+  void set_compressor_exhaust_temp_sensor(sensor::Sensor *s) { compressor_exhaust_temp_sensor_ = s; }
 
   // Memory diagnostics sensors (optional)
   void set_heap_free_sensor(sensor::Sensor *s) { heap_free_sensor_ = s; }
@@ -349,18 +339,7 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   sensor::Sensor *compressor_freq_sensor_{nullptr};
   sensor::Sensor *outdoor_temp_sensor_{nullptr};
   sensor::Sensor *outdoor_cond_temp_sensor_{nullptr};
-
-  // Raw protocol diagnostics sensors. Useful for validating alternative status maps.
-  sensor::Sensor *status_byte_22_sensor_{nullptr};
-  sensor::Sensor *status_byte_23_sensor_{nullptr};
-  sensor::Sensor *status_byte_24_sensor_{nullptr};
-  sensor::Sensor *status_byte_42_sensor_{nullptr};
-  sensor::Sensor *status_byte_43_sensor_{nullptr};
-  sensor::Sensor *status_byte_44_sensor_{nullptr};
-  sensor::Sensor *status_byte_45_sensor_{nullptr};
-  sensor::Sensor *status_byte_46_sensor_{nullptr};
-  sensor::Sensor *status_byte_47_sensor_{nullptr};
-  sensor::Sensor *status_byte_48_sensor_{nullptr};
+  sensor::Sensor *compressor_exhaust_temp_sensor_{nullptr};
 
   // Memory diagnostics
   sensor::Sensor *heap_free_sensor_{nullptr};
