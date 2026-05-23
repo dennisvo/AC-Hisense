@@ -576,7 +576,7 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
   last_status_frame_.assign(b.begin(), b.end());
 
   // Ensure we have all expected bytes
-  if (b.size() < 46) {
+  if (b.size() < 49) {
     ESP_LOGE(TAG, "Status frame too short (%u), cannot parse fully", (unsigned) b.size());
     return;
   }
@@ -678,6 +678,19 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
   publish_gated_state_();
   update_led_switch_state_();
 
+  // Log raw diagnostic bytes before publishing optional sensors.
+  // These indexes come from an alternative Hisense ESPHome component and must be
+  // validated on this specific indoor unit before being mapped to named sensors.
+  ESP_LOGD(TAG,
+           "Diag raw bytes: b22=%u b23=%u b24=%u | b42=%u b43=%u b44=%u/%d b45=%u/%d b46=%u/%d b47=%u/%d b48=%u/%d",
+           b[22], b[23], b[24],
+           b[42], b[43],
+           b[44], static_cast<int8_t>(b[44]),
+           b[45], static_cast<int8_t>(b[45]),
+           b[46], static_cast<int8_t>(b[46]),
+           b[47], static_cast<int8_t>(b[47]),
+           b[48], static_cast<int8_t>(b[48]));
+
   // Publish optional sensors (with sign conversion for outdoor temperatures)
 #ifdef USE_SENSOR
   if (set_temp_sensor_ != nullptr) set_temp_sensor_->publish_state(b[IDX_SET_TEMP]);
@@ -702,6 +715,18 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
     int8_t t = static_cast<int8_t>(b[IDX_OUTDOOR_COND_TEMP]);
     outdoor_cond_temp_sensor_->publish_state(static_cast<float>(t));
   }
+
+  // Raw diagnostic bytes. Publish unsigned values exactly as seen in the status frame.
+  if (status_byte_22_sensor_ != nullptr) status_byte_22_sensor_->publish_state(b[22]);
+  if (status_byte_23_sensor_ != nullptr) status_byte_23_sensor_->publish_state(b[23]);
+  if (status_byte_24_sensor_ != nullptr) status_byte_24_sensor_->publish_state(b[24]);
+  if (status_byte_42_sensor_ != nullptr) status_byte_42_sensor_->publish_state(b[42]);
+  if (status_byte_43_sensor_ != nullptr) status_byte_43_sensor_->publish_state(b[43]);
+  if (status_byte_44_sensor_ != nullptr) status_byte_44_sensor_->publish_state(b[44]);
+  if (status_byte_45_sensor_ != nullptr) status_byte_45_sensor_->publish_state(b[45]);
+  if (status_byte_46_sensor_ != nullptr) status_byte_46_sensor_->publish_state(b[46]);
+  if (status_byte_47_sensor_ != nullptr) status_byte_47_sensor_->publish_state(b[47]);
+  if (status_byte_48_sensor_ != nullptr) status_byte_48_sensor_->publish_state(b[48]);
 #endif
 
 #ifdef USE_TEXT_SENSOR
