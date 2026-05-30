@@ -493,11 +493,21 @@ uint8_t ACHIClimate::encode_kelon_mode_(climate::ClimateMode mode) const {
 }
 
 void ACHIClimate::set_kelon_fan_(Kelon168Data *data, climate::ClimateFanMode fan_mode, bool turbo_fan) const {
+  // Fan mode in Kelon168 IR frames is split between state[2] bits 0..1
+  // and state[17] bit 0x40. The mapping below is based on captures from
+  // this Hisense indoor unit while sending vertical/horizontal swing commands,
+  // i.e. frames where fan mode is preserved rather than cycled by the Fan key:
+  //   AUTO   -> state[2] = 0, state[17]&0x40 = 0
+  //   TURBO  -> state[2] = 1, state[17]&0x40 = 0
+  //   HIGH   -> state[2] = 1, state[17]&0x40 = 1
+  //   MEDIUM -> state[2] = 2, state[17]&0x40 = 0
+  //   LOW    -> state[2] = 3, state[17]&0x40 = 1
+  //   QUIET  -> state[2] = 3, state[17]&0x40 = 0
   data->state[2] &= ~0x03;
   data->state[17] &= ~0x40;
 
   if (turbo_fan) {
-    data->state[2] |= 0x01;  // High airflow in Kelon168 IR encoding.
+    data->state[2] |= 0x01;
     return;
   }
 
@@ -511,12 +521,10 @@ void ACHIClimate::set_kelon_fan_(Kelon168Data *data, climate::ClimateFanMode fan
       break;
     case climate::CLIMATE_FAN_HIGH:
       data->state[2] |= 0x01;
+      data->state[17] |= 0x40;
       break;
     case climate::CLIMATE_FAN_QUIET:
-      // Kelon168 has no explicit Quiet fan value in this implementation.
-      // Use the least aggressive airflow so the iFeel frame remains conservative.
       data->state[2] |= 0x03;
-      data->state[17] |= 0x40;
       break;
     case climate::CLIMATE_FAN_AUTO:
     default:
