@@ -4,17 +4,17 @@
 
 This custom component provides full climate control for air conditioners manufactured by Hisense and its OEM brands (Ballu, etc.) that use the RS-485 protocol. It has been tested on:
 
-**Hisense CITY DC Inverter AS-13UW4RYRCM04G/04W** 
+❄️ **Hisense CITY DC Inverter AS-13UW4RYRCM04G/04W** 
 
-**Hisense SILVER CRYSTAL SUPER DC Inverter AS-13UW4RVETG01**
+❄️ **Hisense SILVER CRYSTAL SUPER DC Inverter AS-13UW4RVETG01**
 
-**Newtek NT-77HSDC12**
+❄️ **Newtek NT-77HSDC12**
 
-**Ballu iGreen Pro DC BSAGI-07HN8, BSAGI-12HN8**
+❄️ **Ballu iGreen Pro DC BSAGI-07HN8, BSAGI-12HN8**
 
 and should work with many other models.
 
-The component exposes a standard Home Assistant Climate entity, along with a set of optional sensors and switches to access all advanced features of the AC (turbo, eco, quiet, sleep, swing, LED, iFeel etc.).
+The component exposes a standard Home Assistant Climate entity, along with a set of optional sensors and switches to access all advanced features of the AC (turbo, eco, quiet, sleep, swing, LED, iFeel (temperature from any sensor from the home assistant) etc.).
 
 ## Hardware requirements
 
@@ -25,6 +25,7 @@ The component exposes a standard Home Assistant Climate entity, along with a set
     \- B (RS-485) → B of transceiver  
     \- Transceiver's RXD to ESP RX pin (e.g., GPIO16)  
     \- Transceiver's TXD to ESP TX pin (e.g., GPIO17)  
+    \- **direct connection (not cross-connection)**  
     \- Power (3.3V or 5V depending on module) and GND
 
 > ⚠️ The AC uses 5V logic levels on its RS‑485 port. Make sure your transceiver is 3.3V‑tolerant if you power the ESP from 3.3V.
@@ -33,16 +34,6 @@ The component exposes a standard Home Assistant Climate entity, along with a set
 
 
 ## Installation
-
-### Using `external_components` (recommended)
-
-Add the following to your ESPHome YAML configuration:
-
-```yaml
-external_components:
-  - source: github://Druidblack/AC-Hi
-    refresh: 30s
-```
 
 ## Example configuration
 
@@ -219,6 +210,109 @@ climate:
       unit_of_measurement: "B"
       device_class: data_size
       state_class: measurement
+```
+
+configuration for the iFeel function (uses mqtt, an external IR transmitter, and any thermometer from home assistant)
+
+```yaml
+
+mqtt:
+  broker: 192.168.1.71
+  username: admin
+  password: admin
+
+  discovery: false
+  discover_ip: false
+  discovery_retain: false
+
+  topic_prefix: null
+
+  log_topic: null
+
+  birth_message:
+  will_message:
+  shutdown_message:
+
+sensor:
+  - platform: homeassistant
+    id: room_temperature_for_ifeel
+    entity_id: sensor.ble_temperature_a4c13836f782 # thermometer from the home assistant
+    internal: true
+
+switch:
+  - platform: template
+    id: hisense_ifeel_enabled
+    name: "Hisense iFeel"
+    optimistic: true
+    restore_mode: RESTORE_DEFAULT_OFF
+    turn_on_action:
+      - ac_hi.ifeel:
+          id: hisense_ac
+          temperature: !lambda "return id(room_temperature_for_ifeel).state;"
+          enabled: true
+    turn_off_action:
+      - ac_hi.ifeel:
+          id: hisense_ac
+          temperature: 0
+          enabled: false
+
+interval:
+  - interval: 2min
+    then:
+      - if:
+          condition:
+            switch.is_on: hisense_ifeel_enabled
+          then:
+            - ac_hi.ifeel:
+                id: hisense_ac
+                temperature: !lambda "return id(room_temperature_for_ifeel).state;"
+                enabled: true
+
+climate:
+  - platform: ac_hi
+    name: "Hisense AC"
+    id: hisense_ac
+    uart_id: ac_uart
+    update_interval: 2s
+    enable_presets: true
+
+    ifeel_mqtt_topic: hisense_ac_zal/ir/kelon168/tx
+    ifeel_mqtt_payload: hex
+    ifeel_mqtt_qos: 0
+    ifeel_mqtt_retain: false
+
+and the rest of the sensors from the main prime
+
+```
+   
+configuration for the IR transmitter   
+```yaml
+
+external_components:
+  - source: github://Druidblack/AC-iFeel@main
+    components: [ kelon168_mqtt_ir ]
+    refresh: 30s
+
+mqtt:
+  broker: 192.168.1.71
+  username: admin
+  password: admin
+
+  discovery: false
+  discover_ip: false
+  discovery_retain: false
+  topic_prefix: null
+  log_topic: null
+  birth_message:
+  will_message:
+  shutdown_message:
+
+kelon168_mqtt_ir:
+  transmitter_id: ir_tx
+  topic: hisense_ac_zal/ir/kelon168/tx
+  qos: 0
+  send_times: 1
+
 ```
 
 ## Entities provided
