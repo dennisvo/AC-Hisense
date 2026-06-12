@@ -321,7 +321,8 @@ kelon168_mqtt_ir:
 
 <img width="991" height="803" alt="image" src="https://github.com/user-attachments/assets/4980e7cc-d490-44fc-9df1-1b265cea544a" />
 
-<img width="1030" height="884" alt="image" src="https://github.com/user-attachments/assets/79785921-7fdf-4b84-a6b9-083c192837d0" />
+<img width="1075" height="992" alt="image" src="https://github.com/user-attachments/assets/0924cce2-2d55-4f90-9843-5b9d3fd2f9ec" />
+
 
 
 
