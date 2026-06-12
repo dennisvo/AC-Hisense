@@ -14,6 +14,8 @@ This custom component provides full climate control for air conditioners manufac
 
 ❄️  **Ballu iGreen Pro DC BSAGI-18HN8_V4**
 
+❄️  **Ballu Platinum DC BSEI-09HN8_V3**
+
 and should work with many other models.
 
 The component exposes a standard Home Assistant Climate entity, along with a set of optional sensors and switches to access all advanced features of the AC (turbo, eco, quiet, sleep, swing, LED, iFeel (temperature from any sensor from the home assistant) etc.).
