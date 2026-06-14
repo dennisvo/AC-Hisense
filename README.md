@@ -41,7 +41,7 @@ The component exposes a standard Home Assistant Climate entity, along with a set
 
 ## Example configuration
 
-A minimal configuration with all optional sensors and switches:
+A configuration with all optional sensors and switches:
 
 ```yaml
 esp32:
@@ -317,6 +317,15 @@ kelon168_mqtt_ir:
   qos: 0
   send_times: 1
 
+```
+For flashing the native module (AEH-W4G1)
+```yaml
+  id: ac_uart
+  tx_pin: 20
+  rx_pin: 
+    number: 21
+    inverted: true
+  baud_rate: 9600
 ```
 
 ## Entities provided
