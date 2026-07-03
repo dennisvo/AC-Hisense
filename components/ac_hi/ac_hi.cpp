@@ -130,15 +130,29 @@ void ACHIClimate::setup() {
   update_sound_switch_state_();
   update_memory_switch_state_();
 
+  // Remember boot time so the first status poll is delayed after a full power restore.
+  // Indoor AC boards can be noisy on UART while they are still booting; polling too early
+  // may flood the component and starve ESPHome API/Wi-Fi.
+  boot_ms_ = millis();
+
   // Pre‑reserve buffers to avoid reallocations
   rx_.reserve(RX_BUFFER_RESERVE);
   last_status_frame_.reserve(MAX_FRAME_BYTES);
   last_tx_frame_.reserve(MAX_FRAME_BYTES);
 
-  ESP_LOGI(TAG, "Setup complete");
+  ESP_LOGI(TAG, "Setup complete; first AC status query will be delayed by %u ms",
+           (unsigned) STARTUP_POLL_DELAY_MS);
 }
 
 void ACHIClimate::update() {
+  // Give the indoor AC controller time to boot after a complete power loss.
+  // Without this guard, the ESP can query the UART while the AC board is still
+  // starting and producing incomplete/noisy frames.
+  if (millis() - boot_ms_ < STARTUP_POLL_DELAY_MS) {
+    ESP_LOGD(TAG, "Startup delay: skipping status query");
+    return;
+  }
+
   if (!writing_lock_ && !pending_control_) {
     send_query_status_();
   } else {
@@ -148,12 +162,22 @@ void ACHIClimate::update() {
 
 void ACHIClimate::loop() {
   // 1. Accumulate incoming bytes without provoking UART timeout logs when no data is available.
+  // Limit the number of bytes read in one loop iteration. After a full AC power restore
+  // the indoor controller may emit a burst of bytes/noise; reading it all at once can
+  // starve ESPHome API/Wi-Fi and cause Home Assistant disconnects.
   uint8_t c;
-  while (available() > 0) {
+  uint16_t read_count = 0;
+  while (available() > 0 && read_count < MAX_UART_BYTES_PER_LOOP) {
     if (!read_byte(&c)) {
       break;
     }
     rx_.push_back(c);
+    read_count++;
+  }
+  if (read_count >= MAX_UART_BYTES_PER_LOOP && available() > 0) {
+    ESP_LOGV(TAG, "UART backlog remains after %u bytes, yielding to ESPHome",
+             (unsigned) read_count);
+    yield();
   }
 
   // 2. Compact RX buffer if too much data has been consumed

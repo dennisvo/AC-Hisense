@@ -138,6 +138,8 @@ static constexpr size_t   MAX_FRAME_BYTES      = 96;
 static constexpr uint32_t WRITE_LOCK_TIMEOUT   = 5000;   // ms
 static constexpr uint32_t CONTROL_DEBOUNCE_MS  = 200;    // ms
 static constexpr uint32_t MEM_PUBLISH_INTERVAL_MS = 5000; // for memory diagnostics
+static constexpr uint32_t STARTUP_POLL_DELAY_MS = 10000;  // delay first AC query after boot
+static constexpr uint16_t MAX_UART_BYTES_PER_LOOP = 128;  // keep API/Wi-Fi responsive during UART bursts
 
 class ACHIClimate : public climate::Climate, public PollingComponent, public uart::UARTDevice {
  public:
@@ -277,6 +279,9 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   // Pending control from HA (debounced)
   bool pending_control_{false};
   uint32_t last_control_ms_{0};
+
+  // Boot guard: avoids querying the indoor AC controller while it is still starting.
+  uint32_t boot_ms_{0};
 
   // Audible beep is requested only for real user commands when command sound is enabled.
   // Automatic HA-priority re-sends stay silent to avoid repeated beeping.

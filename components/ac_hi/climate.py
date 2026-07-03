@@ -124,7 +124,7 @@ CONFIG_SCHEMA = BASE_CLIMATE_SCHEMA.extend({
     cv.Optional(CONF_PSRAM_TOTAL): sensor.sensor_schema(),
     cv.Optional(CONF_PSRAM_FREE): sensor.sensor_schema(),
 
-}).extend(uart.UART_DEVICE_SCHEMA).extend(cv.polling_component_schema("1s"))
+}).extend(uart.UART_DEVICE_SCHEMA).extend(cv.polling_component_schema("5s"))
 
 async def to_code(config):
     var = cg.new_Pvariable(config[CONF_ID])
