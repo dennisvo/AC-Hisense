@@ -91,7 +91,8 @@ void ACHIClimate::setup() {
   if (flow_control_pin_ != nullptr) {
     flow_control_pin_->setup();
     flow_control_pin_->digital_write(false);  // Start in RX mode
-    ESP_LOGI(TAG, "RS485 flow control pin configured; starting in RX mode");
+    ESP_LOGI(TAG, "RS485 flow control pin: GPIO%u configured; starting in RX mode",
+             (unsigned) flow_control_pin_->get_pin());
   }
 
   // Register custom presets on the Climate entity, not on ClimateTraits.
