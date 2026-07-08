@@ -55,18 +55,26 @@ If your board has a dedicated direction/enable pin, you must configure `flow_con
 
 **Example (Seeed XIAO ESP32-C3 + RS485 Breakout):**
 
+The Seeed XIAO ESP32-C3 pin mapping for the RS485 Breakout Board is:
+
+| Function | D label | GPIO |
+|----------|---------|------|
+| UART TX  | D4      | GPIO6 |
+| UART RX  | D5      | GPIO7 |
+| RS485 DE/RE | D2   | GPIO4 |
+
 ```yaml
 uart:
   id: ac_uart
-  tx_pin: GPIO6
-  rx_pin: GPIO7
+  tx_pin: GPIO6    # D4 on Seeed XIAO ESP32-C3
+  rx_pin: GPIO7    # D5 on Seeed XIAO ESP32-C3
   baud_rate: 9600
 
 climate:
   - platform: ac_hi
     name: "Hisense AC"
     uart_id: ac_uart
-    flow_control_pin: GPIO3    # D2 on Seeed XIAO - RS485 DE/RE pin
+    flow_control_pin: GPIO4    # D2 on Seeed XIAO ESP32-C3 - RS485 DE/RE pin
     update_interval: 2s
 ```
 
