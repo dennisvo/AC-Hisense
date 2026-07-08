@@ -155,7 +155,7 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   void set_led_switch(ACHILEDTargetSwitch *s) { led_switch_ = s; if (led_switch_) led_switch_->set_parent(this); }
   void set_sound_switch(ACHICommandSoundSwitch *s) { sound_switch_ = s; if (sound_switch_) sound_switch_->set_parent(this); }
   void set_memory_switch(ACHIMemorySwitch *s) { memory_switch_ = s; if (memory_switch_) memory_switch_->set_parent(this); }
-  void set_flow_control_pin(GPIOPin *pin) { flow_control_pin_ = pin; }
+  void set_flow_control_pin(InternalGPIOPin *pin) { flow_control_pin_ = pin; }
   void set_ir_transmitter(remote_base::RemoteTransmitterBase *t) { ir_transmitter_ = t; }
   void set_ifeel_mqtt_topic(const std::string &topic) { ifeel_mqtt_topic_ = topic; }
   void set_ifeel_mqtt_payload_format(const std::string &format) {
@@ -302,7 +302,7 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
 
   // Optional RS485 direction control pin (DE/RE). When configured, the component
   // drives this pin HIGH before transmitting and LOW after flush() to return to RX mode.
-  GPIOPin *flow_control_pin_{nullptr};
+  InternalGPIOPin *flow_control_pin_{nullptr};
 
   // Optional Kelon168 IR/MQTT output for iFeel / Follow Me commands.
   remote_base::RemoteTransmitterBase *ir_transmitter_{nullptr};
