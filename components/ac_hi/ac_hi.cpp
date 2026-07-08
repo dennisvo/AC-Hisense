@@ -23,8 +23,8 @@ static void log_kelon168_data(const char *prefix, const Kelon168Data &data) {
   ESP_LOGI(TAG, "%s Kelon168 IR: %s (command=0x%02X)", prefix, buffer, data.command());
 }
 
-static const char *const CUSTOM_PRESET_QUIET = "Тихий";
-static const char *const CUSTOM_FAN_TURBO = "Турбо";
+static const char *const CUSTOM_PRESET_QUIET = "Quiet";
+static const char *const CUSTOM_FAN_TURBO = "Turbo";
 
 // Restore the last target temperature after Turbo is turned off from HA.
 static uint8_t g_pre_turbo_target_c = 24;
@@ -87,6 +87,13 @@ void ACHIMemorySwitch::write_state(bool state) {
 // ---- ACHIClimate implementation ----
 
 void ACHIClimate::setup() {
+  // Configure optional RS485 flow control pin (DE/RE) for manual-direction transceivers.
+  if (flow_control_pin_ != nullptr) {
+    flow_control_pin_->setup();
+    flow_control_pin_->digital_write(false);  // Start in RX mode
+    ESP_LOGI(TAG, "RS485 flow control pin configured; starting in RX mode");
+  }
+
   // Register custom presets on the Climate entity, not on ClimateTraits.
   // ClimateTraits::set_supported_custom_presets() is deprecated and will be removed in ESPHome 2026.11.0.
   if (enable_presets_) {
@@ -518,8 +525,10 @@ void ACHIClimate::build_tx_from_desired_() {
 void ACHIClimate::send_query_status_() {
   ESP_LOGD(TAG, "Sending status query (0x66)");
   log_frame_("TX query", query_);
+  if (flow_control_pin_ != nullptr) flow_control_pin_->digital_write(true);
   for (auto b : query_) write_byte(b);
   flush();
+  if (flow_control_pin_ != nullptr) flow_control_pin_->digital_write(false);
 }
 
 // ---- Send write command ----
@@ -530,8 +539,10 @@ void ACHIClimate::send_write_changes_() {
   ESP_LOGD(TAG, "Sending write command (0x65): beep_byte[23]=0x%02X led_byte[36]=0x%02X",
            tx_bytes_[IDX_TX_BEEP], tx_bytes_[IDX_TX_LED]);
   log_frame_("TX write", tx_bytes_);
+  if (flow_control_pin_ != nullptr) flow_control_pin_->digital_write(true);
   for (auto b : tx_bytes_) write_byte(b);
   flush();
+  if (flow_control_pin_ != nullptr) flow_control_pin_->digital_write(false);
 
   last_tx_frame_.assign(tx_bytes_.begin(), tx_bytes_.end());
   beep_on_next_write_ = false;

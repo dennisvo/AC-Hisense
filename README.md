@@ -2,7 +2,11 @@
 
 ![primer](https://github.com/user-attachments/assets/1ad2cd3d-0561-4a50-bdaf-25f950640be8)
 
+Upstream Fork from https://github.com/Druidblack/AC-Hisense (changed Russian presets to English, added flow control support for Seeed Studio XIAO RS485 breakout board in combination with Seeed Studio ESP32C3)
+
 This custom component provides full climate control for air conditioners manufactured by Hisense and its OEM brands (Ballu, etc.) that use the RS-485 protocol. It has been tested on:
+
+❄️ **Hisense Free Match Multi Split 4AMW81U4RJC** 
 
 ❄️ **Hisense CITY DC Inverter AS-13UW4RYRCM04G/04W** 
 
@@ -34,6 +38,40 @@ The component exposes a standard Home Assistant Climate entity, along with a set
 
 > ⚠️ The AC uses 5V logic levels on its RS‑485 port. Make sure your transceiver is 3.3V‑tolerant if you power the ESP from 3.3V.
 
+### RS485 Flow Control Pin (manual-direction transceivers)
+
+Some RS485 breakout boards (e.g., **Seeed XIAO RS485 Breakout Board** with the TP8485E transceiver) do **not** auto-switch between transmit and receive. They require the microcontroller to manually drive a DE/RE (Direction Enable) pin:
+
+- **HIGH** = transmit mode
+- **LOW** = receive mode
+
+If your board has a dedicated direction/enable pin, you must configure `flow_control_pin` so the component switches the transceiver back to receive mode after each transmission. Without this, the transceiver stays in TX mode permanently and the ESP will never receive AC status responses.
+
+**Symptoms of a missing flow control pin configuration:**
+- Commands work (AC responds to power/temp/fan changes)
+- No status updates are ever received
+- UART debug shows only `>>>` (transmitted) frames, never `<<<` (received)
+- Log shows repeated "Write lock timeout, forcing unlock"
+
+**Example (Seeed XIAO ESP32-C3 + RS485 Breakout):**
+
+```yaml
+uart:
+  id: ac_uart
+  tx_pin: GPIO6
+  rx_pin: GPIO7
+  baud_rate: 9600
+
+climate:
+  - platform: ac_hi
+    name: "Hisense AC"
+    uart_id: ac_uart
+    flow_control_pin: GPIO3    # D2 on Seeed XIAO - RS485 DE/RE pin
+    update_interval: 2s
+```
+
+If your RS485 transceiver has automatic direction control (e.g., most MAX3485-based boards with no enable pin exposed), simply omit `flow_control_pin` — the component works without it by default.
+
 <img width="1055" height="1053" alt="image" src="https://github.com/user-attachments/assets/933c420f-395c-4ee8-a7df-6d1056cbf31e" />
 
 
@@ -61,7 +99,7 @@ uart:
   stop_bits: 1
 
 external_components:
-  - source: github://Druidblack/AC-Hi
+  - source: github://dennisvo/AC-Hisense
     refresh: 30s
 
 climate:

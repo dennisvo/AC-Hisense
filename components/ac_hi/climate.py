@@ -1,5 +1,5 @@
 import esphome.codegen as cg
-from esphome import automation
+from esphome import automation, pins
 import esphome.config_validation as cv
 from esphome.components import climate, uart, sensor, switch, text_sensor, remote_base
 from esphome.const import CONF_ID, CONF_UART_ID, CONF_NAME, CONF_TEMPERATURE, ENTITY_CATEGORY_CONFIG, ICON_LIGHTBULB
@@ -62,10 +62,12 @@ CONF_HEAP_MAX_ALLOC = "heap_max_alloc"
 CONF_HEAP_FRAGMENTATION = "heap_fragmentation"
 CONF_PSRAM_TOTAL = "psram_total"
 CONF_PSRAM_FREE = "psram_free"
+CONF_FLOW_CONTROL_PIN = "flow_control_pin"
 
 CONFIG_SCHEMA = BASE_CLIMATE_SCHEMA.extend({
     **BASE_CLIMATE_EXTRA,
     cv.Optional(CONF_ENABLE_PRESETS, default=True): cv.boolean,
+    cv.Optional(CONF_FLOW_CONTROL_PIN): pins.gpio_output_pin_schema,
     cv.Optional(CONF_IR_TRANSMITTER_ID): cv.use_id(remote_base.RemoteTransmitterBase),
     cv.Optional(CONF_IFEEL_MQTT_TOPIC): cv.string_strict,
     cv.Optional(CONF_IFEEL_MQTT_PAYLOAD, default="hex"): cv.one_of("hex", "json", lower=True),
@@ -135,6 +137,10 @@ async def to_code(config):
     cg.add(var.set_uart_parent(uart_comp))
 
     cg.add(var.set_enable_presets(config[CONF_ENABLE_PRESETS]))
+
+    if CONF_FLOW_CONTROL_PIN in config:
+        pin = await cg.gpio_pin_expression(config[CONF_FLOW_CONTROL_PIN])
+        cg.add(var.set_flow_control_pin(pin))
 
     if tx_id := config.get(CONF_IR_TRANSMITTER_ID):
         tx = await cg.get_variable(tx_id)
