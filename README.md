@@ -447,6 +447,27 @@ A built-in countdown timer that turns the AC off after a selected duration. Runs
       accuracy_decimals: 0
       icon: "mdi:timer-sand"
 ```
+
+**Scheduled run with Home Assistant automation:**
+
+To turn the AC on at a specific time and run it for a set duration, combine a HA time trigger with the auto-off timer:
+
+```yaml
+automation:
+  - alias: "AC on at 7 AM for 2 hours"
+    trigger:
+      platform: time
+      at: "07:00:00"
+    action:
+      - service: select.select_option
+        target:
+          entity_id: select.ac_auto_off_timer
+        data:
+          option: "2 hours"
+```
+
+The ESP handles the reliable countdown (survives HA restarts or network issues), while HA handles the scheduling.
+
 ## How it works
 
 The component communicates with the AC via a simple request/response protocol over RS‑485.
