@@ -2,7 +2,7 @@
 
 ![primer](https://github.com/user-attachments/assets/1ad2cd3d-0561-4a50-bdaf-25f950640be8)
 
-Upstream Fork from https://github.com/Druidblack/AC-Hisense (changed Russian presets to English, added flow control support for Seeed Studio XIAO RS485 breakout board in combination with Seeed Studio ESP32C3)
+Upstream Fork from https://github.com/Druidblack/AC-Hisense (changed Russian presets to English, added flow control support for Seeed Studio XIAO RS485 breakout board in combination with Seeed Studio ESP32C3, added timer functionality)
 
 This custom component provides full climate control for air conditioners manufactured by Hisense and its OEM brands (Ballu, etc.) that use the RS-485 protocol. It has been tested on:
 
@@ -420,7 +420,33 @@ Most sensors publish raw values received from the AC:
 
 -   `led_switch`: Controls the indoor unit’s LED backlight.
 -   `command_sound` : Command reception sound control.
+### Auto-off timer (optional)
 
+A built-in countdown timer that turns the AC off after a selected duration. Runs entirely on the ESP32 — no Home Assistant dependency.
+
+-   `auto_off_timer`: A **Select** (dropdown) entity with predefined durations:  
+    `Off`, `15 min`, `30 min`, `1 hour`, `1.5 hours`, `2 hours`, `3 hours`, `4 hours`, `6 hours`, `8 hours`
+-   `auto_off_remaining`: A **Sensor** showing remaining minutes until auto-off (updates every 30 seconds).
+
+**Behavior:**
+-   Setting a duration starts the countdown. If the AC is off, it will be turned on first.
+-   Changing the value resets the countdown to the new duration.
+-   Setting to "Off" cancels the timer.
+-   If the AC is turned off externally (IR remote or HA), the timer is automatically cancelled.
+-   Does not survive ESP reboots (resets to "Off").
+
+**Example configuration:**
+
+```yaml
+    auto_off_timer:
+      name: "AC Auto Off Timer"
+
+    auto_off_remaining:
+      name: "AC Auto Off Remaining"
+      unit_of_measurement: "min"
+      accuracy_decimals: 0
+      icon: "mdi:timer-sand"
+```
 ## How it works
 
 The component communicates with the AC via a simple request/response protocol over RS‑485.

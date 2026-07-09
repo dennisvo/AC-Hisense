@@ -84,6 +84,56 @@ void ACHIMemorySwitch::write_state(bool state) {
   }
 }
 
+// ---- ACHIAutoOffSelect ----
+static const char *const AUTO_OFF_OPTIONS[] = {
+    "Off", "15 min", "30 min", "1 hour", "1.5 hours", "2 hours", "3 hours", "4 hours", "6 hours", "8 hours"};
+static const uint32_t AUTO_OFF_MINUTES[] = {
+    0, 15, 30, 60, 90, 120, 180, 240, 360, 480};
+static const size_t AUTO_OFF_COUNT = sizeof(AUTO_OFF_MINUTES) / sizeof(AUTO_OFF_MINUTES[0]);
+
+void ACHIAutoOffSelect::control(const std::string &value) {
+  this->publish_state(value);
+  if (parent_ == nullptr)
+    return;
+  for (size_t i = 0; i < AUTO_OFF_COUNT; i++) {
+    if (value == AUTO_OFF_OPTIONS[i]) {
+      if (AUTO_OFF_MINUTES[i] == 0) {
+        parent_->cancel_auto_off_timer();
+      } else {
+        parent_->start_auto_off_timer(AUTO_OFF_MINUTES[i]);
+      }
+      return;
+    }
+  }
+  // Unknown option, treat as cancel
+  parent_->cancel_auto_off_timer();
+}
+
+void ACHIClimate::start_auto_off_timer(uint32_t minutes) {
+  auto_off_end_ms_ = millis() + minutes * 60000UL;
+  auto_off_last_publish_ms_ = 0;  // force immediate publish
+  ESP_LOGI(TAG, "Auto-off timer started: %u minutes", (unsigned) minutes);
+  // If AC is currently off, turn it on
+  if (!power_on_) {
+    d_power_on_ = true;
+    if (d_mode_ == climate::CLIMATE_MODE_OFF)
+      d_mode_ = last_active_mode_;
+    pending_control_ = true;
+    last_control_ms_ = millis();
+  }
+}
+
+void ACHIClimate::cancel_auto_off_timer() {
+  if (auto_off_end_ms_ != 0) {
+    ESP_LOGI(TAG, "Auto-off timer cancelled");
+  }
+  auto_off_end_ms_ = 0;
+#ifdef USE_SENSOR
+  if (auto_off_remaining_sensor_ != nullptr)
+    auto_off_remaining_sensor_->publish_state(0);
+#endif
+}
+
 // ---- ACHIClimate implementation ----
 
 void ACHIClimate::setup() {
@@ -218,7 +268,44 @@ void ACHIClimate::loop() {
     pending_control_ = false;
   }
 
-  // 7. Optional memory diagnostics
+  // 7. Auto-off timer
+  if (auto_off_end_ms_ != 0) {
+    uint32_t now = millis();
+    if (now >= auto_off_end_ms_) {
+      // Timer expired — turn AC off
+      ESP_LOGI(TAG, "Auto-off timer expired, turning AC off");
+      d_power_on_ = false;
+      d_mode_ = climate::CLIMATE_MODE_OFF;
+      pending_control_ = true;
+      last_control_ms_ = now;
+      auto_off_end_ms_ = 0;
+      if (auto_off_select_ != nullptr)
+        auto_off_select_->publish_state("Off");
+#ifdef USE_SENSOR
+      if (auto_off_remaining_sensor_ != nullptr)
+        auto_off_remaining_sensor_->publish_state(0);
+#endif
+    } else {
+      // Publish remaining minutes (throttled to once per 30s)
+      if (now - auto_off_last_publish_ms_ >= 30000) {
+        auto_off_last_publish_ms_ = now;
+        uint32_t remaining_min = (auto_off_end_ms_ - now) / 60000UL;
+#ifdef USE_SENSOR
+        if (auto_off_remaining_sensor_ != nullptr)
+          auto_off_remaining_sensor_->publish_state(remaining_min);
+#endif
+      }
+    }
+    // If AC was turned off externally (remote/HA), cancel our timer
+    if (!power_on_ && auto_off_end_ms_ != 0) {
+      ESP_LOGI(TAG, "AC turned off externally, cancelling auto-off timer");
+      cancel_auto_off_timer();
+      if (auto_off_select_ != nullptr)
+        auto_off_select_->publish_state("Off");
+    }
+  }
+
+  // 8. Optional memory diagnostics
   publish_memory_diagnostics_();
 }
 

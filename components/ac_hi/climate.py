@@ -1,16 +1,17 @@
 import esphome.codegen as cg
 from esphome import automation, pins
 import esphome.config_validation as cv
-from esphome.components import climate, uart, sensor, switch, text_sensor, remote_base
+from esphome.components import climate, uart, sensor, switch, select, text_sensor, remote_base
 from esphome.const import CONF_ID, CONF_UART_ID, CONF_NAME, CONF_TEMPERATURE, ENTITY_CATEGORY_CONFIG, ICON_LIGHTBULB
 
-AUTO_LOAD = ["climate", "uart", "sensor", "switch", "text_sensor", "remote_base"]
+AUTO_LOAD = ["climate", "uart", "sensor", "switch", "select", "text_sensor", "remote_base"]
 
 ac_hi_ns = cg.esphome_ns.namespace("ac_hi")
 ACHIClimate = ac_hi_ns.class_("ACHIClimate", climate.Climate, cg.PollingComponent, uart.UARTDevice)
 ACHILEDTargetSwitch = ac_hi_ns.class_("ACHILEDTargetSwitch", switch.Switch)
 ACHICommandSoundSwitch = ac_hi_ns.class_("ACHICommandSoundSwitch", switch.Switch)
 ACHIMemorySwitch = ac_hi_ns.class_("ACHIMemorySwitch", switch.Switch)
+ACHIAutoOffSelect = ac_hi_ns.class_("ACHIAutoOffSelect", select.Select)
 ACHIIFeelAction = ac_hi_ns.class_("ACHIIFeelAction", automation.Action)
 
 # ESPHome 2025.5+ uses climate.climate_schema(...), older versions still use CLIMATE_SCHEMA.
@@ -63,6 +64,8 @@ CONF_HEAP_FRAGMENTATION = "heap_fragmentation"
 CONF_PSRAM_TOTAL = "psram_total"
 CONF_PSRAM_FREE = "psram_free"
 CONF_FLOW_CONTROL_PIN = "flow_control_pin"
+CONF_AUTO_OFF_TIMER = "auto_off_timer"
+CONF_AUTO_OFF_REMAINING = "auto_off_remaining"
 
 CONFIG_SCHEMA = BASE_CLIMATE_SCHEMA.extend({
     **BASE_CLIMATE_EXTRA,
@@ -125,6 +128,14 @@ CONFIG_SCHEMA = BASE_CLIMATE_SCHEMA.extend({
     cv.Optional(CONF_HEAP_FRAGMENTATION): sensor.sensor_schema(),
     cv.Optional(CONF_PSRAM_TOTAL): sensor.sensor_schema(),
     cv.Optional(CONF_PSRAM_FREE): sensor.sensor_schema(),
+
+    # Auto-off timer (select dropdown + optional remaining sensor)
+    cv.Optional(CONF_AUTO_OFF_TIMER): select.select_schema(
+        ACHIAutoOffSelect,
+        icon="mdi:timer-outline",
+        entity_category=ENTITY_CATEGORY_CONFIG,
+    ),
+    cv.Optional(CONF_AUTO_OFF_REMAINING): sensor.sensor_schema(),
 
 }).extend(uart.UART_DEVICE_SCHEMA).extend(cv.polling_component_schema("5s"))
 
@@ -270,6 +281,19 @@ async def to_code(config):
     if conf := config.get(CONF_PSRAM_FREE):
         sens = await sensor.new_sensor(conf)
         cg.add(var.set_psram_free_sensor(sens))
+
+    # Auto-off timer select
+    if conf := config.get(CONF_AUTO_OFF_TIMER):
+        sel = await select.new_select(
+            conf,
+            options=["Off", "15 min", "30 min", "1 hour", "1.5 hours", "2 hours", "3 hours", "4 hours", "6 hours", "8 hours"],
+        )
+        cg.add(var.set_auto_off_select(sel))
+
+    # Auto-off remaining sensor
+    if conf := config.get(CONF_AUTO_OFF_REMAINING):
+        sens = await sensor.new_sensor(conf)
+        cg.add(var.set_auto_off_remaining_sensor(sens))
 
 IFEEL_SCHEMA = cv.Schema(
     {

@@ -5,6 +5,7 @@
 #include "esphome/core/component.h"
 #include "esphome/core/hal.h"
 #include "esphome/components/switch/switch.h"
+#include "esphome/components/select/select.h"
 #include "esphome/components/remote_base/remote_base.h"
 #include "esphome/core/automation.h"
 #include "kelon168_protocol.h"
@@ -58,6 +59,16 @@ class ACHIMemorySwitch : public switch_::Switch {
   void set_parent(ACHIClimate *p) { parent_ = p; }
  protected:
   void write_state(bool state) override;
+ private:
+  ACHIClimate *parent_{nullptr};
+};
+
+// Select entity for the auto-off timer (dropdown with predefined durations).
+class ACHIAutoOffSelect : public select::Select {
+ public:
+  void set_parent(ACHIClimate *p) { parent_ = p; }
+ protected:
+  void control(const std::string &value) override;
  private:
   ACHIClimate *parent_{nullptr};
 };
@@ -155,6 +166,12 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   void set_led_switch(ACHILEDTargetSwitch *s) { led_switch_ = s; if (led_switch_) led_switch_->set_parent(this); }
   void set_sound_switch(ACHICommandSoundSwitch *s) { sound_switch_ = s; if (sound_switch_) sound_switch_->set_parent(this); }
   void set_memory_switch(ACHIMemorySwitch *s) { memory_switch_ = s; if (memory_switch_) memory_switch_->set_parent(this); }
+  void set_auto_off_select(ACHIAutoOffSelect *s) { auto_off_select_ = s; if (auto_off_select_) auto_off_select_->set_parent(this); }
+#ifdef USE_SENSOR
+  void set_auto_off_remaining_sensor(sensor::Sensor *s) { auto_off_remaining_sensor_ = s; }
+#endif
+  void start_auto_off_timer(uint32_t minutes);
+  void cancel_auto_off_timer();
   void set_flow_control_pin(InternalGPIOPin *pin) { flow_control_pin_ = pin; }
   void set_ir_transmitter(remote_base::RemoteTransmitterBase *t) { ir_transmitter_ = t; }
   void set_ifeel_mqtt_topic(const std::string &topic) { ifeel_mqtt_topic_ = topic; }
@@ -427,6 +444,14 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
   ACHILEDTargetSwitch *led_switch_{nullptr};
   ACHICommandSoundSwitch *sound_switch_{nullptr};
   ACHIMemorySwitch *memory_switch_{nullptr};
+  ACHIAutoOffSelect *auto_off_select_{nullptr};
+#ifdef USE_SENSOR
+  sensor::Sensor *auto_off_remaining_sensor_{nullptr};
+#endif
+
+  // Auto-off timer state
+  uint32_t auto_off_end_ms_{0};          // millis() target; 0 = inactive
+  uint32_t auto_off_last_publish_ms_{0}; // throttle remaining-time updates
 
   bool enable_presets_{true};
 
