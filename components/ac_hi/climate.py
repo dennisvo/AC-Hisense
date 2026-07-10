@@ -102,7 +102,6 @@ CONFIG_SCHEMA = BASE_CLIMATE_SCHEMA.extend({
     cv.Optional(CONF_LED_SWITCH): switch.switch_schema(
         ACHILEDTargetSwitch,
         icon=ICON_LIGHTBULB,
-        entity_category=ENTITY_CATEGORY_CONFIG,
     ),
     # Command sound switch is created by default. The user may still override its
     # name/icon by specifying sound_switch: in YAML.
@@ -133,7 +132,6 @@ CONFIG_SCHEMA = BASE_CLIMATE_SCHEMA.extend({
     cv.Optional(CONF_AUTO_OFF_TIMER): select.select_schema(
         ACHIAutoOffSelect,
         icon="mdi:timer-outline",
-        entity_category=ENTITY_CATEGORY_CONFIG,
     ),
     cv.Optional(CONF_AUTO_OFF_REMAINING): sensor.sensor_schema(),
 

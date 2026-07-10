@@ -416,10 +416,20 @@ Most sensors publish raw values received from the AC:
 | `compressor_exhaust_temperature` | Compressor Exhaust Temperature (°C) |
 | `power_status` | Text sensor showing "ON" or "OFF" |
 
-### Switches (optional)
+### Controls (optional)
 
--   `led_switch`: Controls the indoor unit’s LED backlight.
--   `command_sound` : Command reception sound control.
+These entities appear in the **Controls** section of the HA device page for quick daily access:
+
+-   `led_switch`: Controls the indoor unit's LED backlight.
+-   `auto_off_timer`: Auto-off countdown timer (see below).
+
+### Configuration switches (optional)
+
+These entities appear in the **Configuration** section (set-once preferences):
+
+-   `command_sound`: Command reception sound control.
+-   `memory_switch`: Restores the last active HVAC mode on generic power-on.
+
 ### Auto-off timer (optional)
 
 A built-in countdown timer that turns the AC off after a selected duration. Runs entirely on the ESP32 — no Home Assistant dependency.
