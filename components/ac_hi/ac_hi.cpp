@@ -188,6 +188,10 @@ void ACHIClimate::setup() {
   update_sound_switch_state_();
   update_memory_switch_state_();
 
+  // Initialize auto-off timer select to "Off"
+  if (auto_off_select_ != nullptr)
+    auto_off_select_->publish_state("Off");
+
   // Remember boot time so the first status poll is delayed after a full power restore.
   // Indoor AC boards can be noisy on UART while they are still booting; polling too early
   // may flood the component and starve ESPHome API/Wi-Fi.
