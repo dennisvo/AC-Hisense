@@ -374,8 +374,8 @@ void ACHIClimate::control(const climate::ClimateCall &call) {
       if (memory_mode_enabled_ && !was_power_on && last_active_mode_ != climate::CLIMATE_MODE_OFF &&
           requested_mode != last_active_mode_) {
         ESP_LOGD(TAG, "Power-on mode %s replaced by last active mode %s because Memory is ON",
-                 climate::climate_mode_to_string(requested_mode),
-                 climate::climate_mode_to_string(last_active_mode_));
+                 LOG_STR_ARG(climate::climate_mode_to_string(requested_mode)),
+                 LOG_STR_ARG(climate::climate_mode_to_string(last_active_mode_)));
         requested_mode = last_active_mode_;
       }
 
@@ -561,8 +561,8 @@ void ACHIClimate::control(const climate::ClimateCall &call) {
   user_command_next_write_ = true;
   beep_on_next_write_ = command_sound_enabled_;
 
-  ESP_LOGD(TAG, "Control: new desired state registered, command_sound=%s, will send after %ums debounce",
-           command_sound_enabled_ ? "ON" : "OFF", CONTROL_DEBOUNCE_MS);
+  ESP_LOGD(TAG, "Control: new desired state registered, command_sound=%s, will send after %lums debounce",
+           command_sound_enabled_ ? "ON" : "OFF", (unsigned long) CONTROL_DEBOUNCE_MS);
 }
 
 // ---- Build TX frame from desired state ----
@@ -1172,9 +1172,9 @@ void ACHIClimate::parse_status_102_(const std::vector<uint8_t> &b) {
   ESP_LOGD(TAG,
            "Parsed: power=%s, mode=%s, fan=%s, swing=%s, target=%u°C, current=%.1f°C, outdoor=%d°C, compressor=%uHz, exhaust=%u°C",
            power_on_ ? "ON" : "OFF",
-           climate::climate_mode_to_string(mode_),
-           climate::climate_fan_mode_to_string(fan_),
-           climate::climate_swing_mode_to_string(swing_),
+           LOG_STR_ARG(climate::climate_mode_to_string(mode_)),
+           LOG_STR_ARG(climate::climate_fan_mode_to_string(fan_)),
+           LOG_STR_ARG(climate::climate_swing_mode_to_string(swing_)),
            (unsigned) target_c_, current_temperature,
            static_cast<int8_t>(b[IDX_OUTDOOR_TEMP]),
            b[IDX_COMP_FREQ], b[IDX_COMPRESSOR_EXHAUST_TEMP]);
