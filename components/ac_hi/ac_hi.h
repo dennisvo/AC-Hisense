@@ -450,7 +450,8 @@ class ACHIClimate : public climate::Climate, public PollingComponent, public uar
 #endif
 
   // Auto-off timer state
-  uint32_t auto_off_end_ms_{0};          // millis() target; 0 = inactive
+  uint32_t auto_off_start_ms_{0};        // millis() when timer was started
+  uint32_t auto_off_duration_ms_{0};     // duration in ms; 0 = inactive
   uint32_t auto_off_last_publish_ms_{0}; // throttle remaining-time updates
 
   bool enable_presets_{true};

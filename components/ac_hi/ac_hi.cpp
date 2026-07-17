@@ -110,7 +110,8 @@ void ACHIAutoOffSelect::control(const std::string &value) {
 }
 
 void ACHIClimate::start_auto_off_timer(uint32_t minutes) {
-  auto_off_end_ms_ = millis() + minutes * 60000UL;
+  auto_off_start_ms_ = millis();
+  auto_off_duration_ms_ = minutes * 60000UL;
   auto_off_last_publish_ms_ = 0;  // force immediate publish
   ESP_LOGI(TAG, "Auto-off timer started: %u minutes", (unsigned) minutes);
   // If AC is currently off, turn it on
@@ -124,10 +125,10 @@ void ACHIClimate::start_auto_off_timer(uint32_t minutes) {
 }
 
 void ACHIClimate::cancel_auto_off_timer() {
-  if (auto_off_end_ms_ != 0) {
+  if (auto_off_duration_ms_ != 0) {
     ESP_LOGI(TAG, "Auto-off timer cancelled");
   }
-  auto_off_end_ms_ = 0;
+  auto_off_duration_ms_ = 0;
 #ifdef USE_SENSOR
   if (auto_off_remaining_sensor_ != nullptr)
     auto_off_remaining_sensor_->publish_state(0);
@@ -273,16 +274,17 @@ void ACHIClimate::loop() {
   }
 
   // 7. Auto-off timer
-  if (auto_off_end_ms_ != 0) {
+  if (auto_off_duration_ms_ != 0) {
     uint32_t now = millis();
-    if (now >= auto_off_end_ms_) {
+    uint32_t elapsed = now - auto_off_start_ms_;
+    if (elapsed >= auto_off_duration_ms_) {
       // Timer expired — turn AC off
       ESP_LOGI(TAG, "Auto-off timer expired, turning AC off");
       d_power_on_ = false;
       d_mode_ = climate::CLIMATE_MODE_OFF;
       pending_control_ = true;
       last_control_ms_ = now;
-      auto_off_end_ms_ = 0;
+      auto_off_duration_ms_ = 0;
       if (auto_off_select_ != nullptr)
         auto_off_select_->publish_state("Off");
 #ifdef USE_SENSOR
@@ -293,7 +295,7 @@ void ACHIClimate::loop() {
       // Publish remaining minutes (throttled to once per 30s)
       if (now - auto_off_last_publish_ms_ >= 30000) {
         auto_off_last_publish_ms_ = now;
-        uint32_t remaining_min = (auto_off_end_ms_ - now) / 60000UL;
+        uint32_t remaining_min = (auto_off_duration_ms_ - elapsed) / 60000UL;
 #ifdef USE_SENSOR
         if (auto_off_remaining_sensor_ != nullptr)
           auto_off_remaining_sensor_->publish_state(remaining_min);
@@ -301,7 +303,7 @@ void ACHIClimate::loop() {
       }
     }
     // If AC was turned off externally (remote/HA), cancel our timer
-    if (!power_on_ && auto_off_end_ms_ != 0) {
+    if (!power_on_ && auto_off_duration_ms_ != 0) {
       ESP_LOGI(TAG, "AC turned off externally, cancelling auto-off timer");
       cancel_auto_off_timer();
       if (auto_off_select_ != nullptr)
